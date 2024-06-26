@@ -1,0 +1,145 @@
+import sys
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QLineEdit, QPushButton, QDateEdit, QCalendarWidget, QCheckBox
+from PyQt5.QtCore import QDate
+import datetime
+
+class SchoolDaysWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Cálculo de Horas Lectivas")
+        self.setGeometry(100, 100, 400, 500)
+
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+
+        main_layout = QVBoxLayout()
+        central_widget.setLayout(main_layout)
+
+        # Fechas de inicio y fin
+        date_layout = QHBoxLayout()
+        start_date_label = QLabel("Fecha de inicio:")
+        self.start_date_input = QDateEdit(calendarPopup=True)
+        end_date_label = QLabel("Fecha de fin:")
+        self.end_date_input = QDateEdit(calendarPopup=True)
+        date_layout.addWidget(start_date_label)
+        date_layout.addWidget(self.start_date_input)
+        date_layout.addWidget(end_date_label)
+        date_layout.addWidget(self.end_date_input)
+        main_layout.addLayout(date_layout)
+
+        # Días festivos
+        holidays_layout = QHBoxLayout()
+        holidays_label = QLabel("Días festivos:")
+        self.holidays_list = QLineEdit()
+        self.holidays_list.setFixedHeight(50)
+        self.holidays_list.setReadOnly(True)
+        holidays_calendar = QCalendarWidget()
+        holidays_calendar.setSelectionMode(3)  # Usar el valor numérico para MultiSelection
+        holidays_calendar.selectionChanged.connect(self.update_holidays)
+        self.selected_holidays = []  # Lista para almacenar las fechas seleccionadas
+        holidays_layout.addWidget(holidays_label)
+        holidays_layout.addWidget(self.holidays_list)
+        holidays_layout.addWidget(holidays_calendar)
+        main_layout.addLayout(holidays_layout)
+
+        # Días de la semana con clases
+        weekdays_layout = QHBoxLayout()
+        weekdays_label = QLabel("Días de la semana con clases:")
+        self.monday_checkbox = QCheckBox("Lunes")
+        self.tuesday_checkbox = QCheckBox("Martes")
+        self.wednesday_checkbox = QCheckBox("Miércoles")
+        self.thursday_checkbox = QCheckBox("Jueves")
+        self.friday_checkbox = QCheckBox("Viernes")
+        weekdays_layout.addWidget(weekdays_label)
+        weekdays_layout.addWidget(self.monday_checkbox)
+        weekdays_layout.addWidget(self.tuesday_checkbox)
+        weekdays_layout.addWidget(self.wednesday_checkbox)
+        weekdays_layout.addWidget(self.thursday_checkbox)
+        weekdays_layout.addWidget(self.friday_checkbox)
+        main_layout.addLayout(weekdays_layout)
+
+         # Horas lectivas por día de la semana
+        hours_layout = QHBoxLayout()
+        hours_label = QLabel("Horas lectivas por día:")
+        self.monday_hours = QLineEdit()
+        self.tuesday_hours = QLineEdit()
+        self.wednesday_hours = QLineEdit()
+        self.thursday_hours = QLineEdit()
+        self.friday_hours = QLineEdit()
+        hours_layout.addWidget(hours_label)
+        hours_layout.addWidget(self.monday_hours)
+        hours_layout.addWidget(self.tuesday_hours)
+        hours_layout.addWidget(self.wednesday_hours)
+        hours_layout.addWidget(self.thursday_hours)
+        hours_layout.addWidget(self.friday_hours)
+        main_layout.addLayout(hours_layout)
+
+        # Conectar señales de los checkboxes
+        self.monday_checkbox.stateChanged.connect(lambda: self.toggle_line_edit(self.monday_hours, self.monday_checkbox))
+        self.tuesday_checkbox.stateChanged.connect(lambda: self.toggle_line_edit(self.tuesday_hours, self.tuesday_checkbox))
+        self.wednesday_checkbox.stateChanged.connect(lambda: self.toggle_line_edit(self.wednesday_hours, self.wednesday_checkbox))
+        self.thursday_checkbox.stateChanged.connect(lambda: self.toggle_line_edit(self.thursday_hours, self.thursday_checkbox))
+        self.friday_checkbox.stateChanged.connect(lambda: self.toggle_line_edit(self.friday_hours, self.friday_checkbox))
+
+        # Botón de cálculo
+        calculate_button = QPushButton("Calcular")
+        calculate_button.clicked.connect(self.calculate_school_hours)
+        main_layout.addWidget(calculate_button)
+
+        # Resultado
+        self.result_label = QLabel("")
+        main_layout.addWidget(self.result_label)
+
+    def update_holidays(self):
+        selected_date = self.sender().selectedDate().toPyDate()
+        if selected_date in self.selected_holidays:
+            self.selected_holidays.remove(selected_date)
+        else:
+            self.selected_holidays.append(selected_date)
+        holidays_list = [date.strftime('%d-%m-%Y') for date in self.selected_holidays]
+        self.holidays_list.setText(', '.join(holidays_list))
+
+    def toggle_line_edit(self, line_edit, checkbox):
+        line_edit.setEnabled(checkbox.isChecked())
+        if not checkbox.isChecked():
+            line_edit.clear()
+
+    def calculate_school_hours(self):
+        try:
+            # Obtener datos de entrada
+            start_date = self.start_date_input.date().toPyDate()
+            end_date = self.end_date_input.date().toPyDate()
+            holidays = self.selected_holidays
+            weekdays = [
+                self.monday_checkbox.isChecked(),
+                self.tuesday_checkbox.isChecked(),
+                self.wednesday_checkbox.isChecked(),
+                self.thursday_checkbox.isChecked(),
+                self.friday_checkbox.isChecked()
+            ]
+            weekday_hours = [
+                int(self.monday_hours.text()) if self.monday_checkbox.isChecked() else 0,
+                int(self.tuesday_hours.text()) if self.tuesday_checkbox.isChecked() else 0,
+                int(self.wednesday_hours.text()) if self.wednesday_checkbox.isChecked() else 0,
+                int(self.thursday_hours.text()) if self.thursday_checkbox.isChecked() else 0,
+                int(self.friday_hours.text()) if self.friday_checkbox.isChecked() else 0
+            ]
+
+            # Calcular horas lectivas
+            school_hours = 0
+            for current_date in (start_date + datetime.timedelta(n) for n in range((end_date - start_date).days + 1)):
+                weekday = current_date.weekday()
+                if weekday < 5 and current_date not in holidays and weekdays[weekday]:
+                    school_hours += weekday_hours[weekday]
+
+            # Mostrar resultado
+            self.result_label.setText(f"Hay {school_hours} horas lectivas en el periodo seleccionado.")
+
+        except ValueError:
+            self.result_label.setText("Formato de entrada inválido. Por favor, verifique las entradas.")
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = SchoolDaysWindow()
+    window.show()
+    sys.exit(app.exec_())
